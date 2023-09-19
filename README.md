@@ -17,6 +17,12 @@ The mapping method for the ``key-value`` is:
 We provided two mapping mechanism ``CB6_species_mapping`` and ``SAPRC07_species_mapping`` in ``Mechanism.py``.
 * ```output_filename```: the name of the output NetCDF emission file.
 
+## Code Structure
+* EmissionGenerator.py: includes all functions for converting BleuSky outputs to CMAQ fire emissions.
+* HeaderInfo.py: includes the variable list for emission files and descriptions of each variable. Users can use a anthropogenic emission to extract such information by using HeaderExtraction.py.
+* HeaderExtraction.py: extracts the header information in emission file (optional).
+* Mechanism.py: definition of mapping BlueSky pollutants species to CMAQ under different chemical mechanisms.
+* main.py: provides two examples for user to reference.
 ## Examples
 We provide two examples for using the function. The examples are in ``main.py``.
 * One is the prescribed fire simulation in Southeastern U.S. The fire lasts less than one day and one daily METCRO3D file can cover the period of prescribed fires.
