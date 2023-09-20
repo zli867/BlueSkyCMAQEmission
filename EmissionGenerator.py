@@ -4,6 +4,7 @@ import numpy as np
 import json
 from datetime import datetime, timedelta
 from HeaderInfo import HEADERINFO
+from shapely.geometry import Polygon
 
 """
 The main function should be used are verticalHourlyEmission and dailyVerticalHourlyEmission
@@ -219,15 +220,19 @@ def verticalHourlyEmission(select_species, metcros3d_files, bsp_filename):
     # species, time, layer, x, y
     emission_tensor = np.zeros((len(select_species), len(mcip_time), LAY, Xcenters.shape[0], Xcenters.shape[1]))
     for bsp_fire in bsp_fires:
-        lat = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lat"]
-        lon = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lng"]
-        fire_id = bsp_fire["id"]
+        if "specified_points" in bsp_fire["activity"][0]['active_areas'][0].keys():
+            lat = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lat"]
+            lon = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lng"]
+            fuelbeds = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["fuelbeds"]
+            plumerise = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["plumerise"]
+        else:
+            lat = bsp_fire["activity"][0]['active_areas'][0]["perimeter"][0]["lat"]
+            lon = bsp_fire["activity"][0]['active_areas'][0]["perimeter"][0]["lng"]
+            fuelbeds = bsp_fire["activity"][0]['active_areas'][0]["perimeter"][0]["fuelbeds"]
+            plumerise = bsp_fire["activity"][0]['active_areas'][0]["perimeter"][0]["plumerise"]
+
         time_profile = bsp_fire["activity"][0]["active_areas"][0]["timeprofile"]
-        area_acres = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["area"]
-        fuelbeds = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["fuelbeds"]
-        emission = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["emissions"]["summary"]
         utc_offset = bsp_fire["activity"][0]['active_areas'][0]["utc_offset"]
-        plumerise = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["plumerise"]
 
         # whether in grid boundary
         fire_x, fire_y = crs(lon, lat)
@@ -317,13 +322,21 @@ def dailyVerticalHourlyEmission(select_species, metcros3d_file, bsp_filename):
     # species, time, layer, x, y
     emission_tensor = np.zeros((len(select_species), len(mcip_time), LAY, Xcenters.shape[0], Xcenters.shape[1]))
     for bsp_fire in bsp_fires:
-        lat = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lat"]
-        lon = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lng"]
-        time_profile = bsp_fire["activity"][0]["active_areas"][0]["timeprofile"]
-        fuelbeds = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["fuelbeds"]
-        utc_offset = bsp_fire["activity"][0]['active_areas'][0]["utc_offset"]
-        plumerise = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["plumerise"]
+        if "specified_points" in bsp_fire["activity"][0]['active_areas'][0].keys():
+            lat = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lat"]
+            lon = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["lng"]
+            fuelbeds = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["fuelbeds"]
+            plumerise = bsp_fire["activity"][0]['active_areas'][0]["specified_points"][0]["plumerise"]
+        else:
+            fire_polygon = Polygon(bsp_fire["activity"][0]['active_areas'][0]["perimeter"]["polygon"])
+            lon, lat = fire_polygon.centroid.xy
+            lat = lat[0]
+            lon = lon[0]
+            fuelbeds = bsp_fire["activity"][0]['active_areas'][0]["perimeter"]["fuelbeds"]
+            plumerise = bsp_fire["activity"][0]['active_areas'][0]["perimeter"]["plumerise"]
 
+        time_profile = bsp_fire["activity"][0]["active_areas"][0]["timeprofile"]
+        utc_offset = bsp_fire["activity"][0]['active_areas'][0]["utc_offset"]
         # update the profile to daily profile
         time_profile, plumerise = daily_profile(time_profile, plumerise, cmaq_3d_info, utc_offset)
 
@@ -347,11 +360,6 @@ def dailyVerticalHourlyEmission(select_species, metcros3d_file, bsp_filename):
             # generate emission matrix (species, time_period, layer)
             emission_matrix = np.zeros((len(select_species), t_length, h_length))
             for i in range(0, len(select_species)):
-                # Original Setting, put the emissions between plume bottom and plume top
-                # emission_matrix[i, :, :] = flaming_hourly_frac * flaming_arry[i] + \
-                #                         smoldering_hourly_frac * smoldering_arry[i] + \
-                #                         residual_hourly_farc * residual_arry[i]
-
                 # Update format: put the smoldering and residual phase on the surface
                 emission_matrix[i, :, :] = flaming_hourly_frac * flaming_arry[i]
                 emission_matrix[i, :, 0] += np.sum(smoldering_hourly_frac * smoldering_arry[i], axis=1) + \
